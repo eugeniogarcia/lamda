@@ -255,5 +255,85 @@ $Env:CF_BUCKET="egsmartin"
 
 sam deploy --s3-bucket $Env:CF_BUCKET --stack-name EventoAPIGW --capabilities CAPABILITY_IAM
 ```
+
+## Pipeline
+
+Vamos a construir dos lambdas que procesan eventos del API Gateway y escriben/leen de Dynamo DB. EN _template.yaml_ tenemos la configuración de los recursos que vamos a desplegar. Primero declaramos las propiedades comunes a todos los recursos:
+
+```yaml
+Globals:
+  Function:
+    Runtime: java8
+    MemorySize: 512
+    Timeout: 25
+    Environment:
+      Variables:
+        LOCATIONS_TABLE: !Ref LocationsTable
+  Api:
+    OpenApiVersion: '3.0.1'
 ```
 
+Destacar como definimos una variable de entorno, _LOCATIONS_TABLE_, con el contenido definido en un recurso del template. Definimos este recurso:
+
+```yaml
+Resources:
+  LocationsTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: locationName
+        Type: String
+```
+
+Podemos ver que se trata de una tabla, de una tabla de Dynamo `AWS::Serverless::SimpleTable`. Llamamos al recurso `LocationsTable`. Las propiedades que hemos definido para el recurso son el primary key.
+
+La primera de las lambdas:
+
+```yaml
+  WeatherEventLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: target/lambda.zip
+      Handler: book.api.WeatherEventLambda::handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LocationsTable
+      Events:
+        ApiEvents:
+          Type: Api
+          Properties:
+            Path: /events
+            Method: POST
+```
+
+Usa la policy `DynamoDBCrudPolicy` que nos permite hacer operaciones CRUD en la tabla indicada. Esta API esta subscrita a un evento del API Gateway que esta expuesto como un _post_ al recurso _events_. La segunda lambda se configura de forma similar:
+
+```yaml
+  WeatherQueryLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: target/lambda.zip
+      Handler: book.api.WeatherQueryLambda::handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref LocationsTable
+      Events:
+        ApiEvents:
+          Type: Api
+          Properties:
+            Path: /locations
+            Method: GET
+```
+
+Observese como la policy solo permite consultar la tabla.
+
+
+Para probar desplegamos el paquete:
+
+```ps
+mvn package
+
+$Env:CF_BUCKET="egsmartin"
+
+sam deploy --s3-bucket $Env:CF_BUCKET --stack-name miPipeline --capabilities CAPABILITY_IAM
+```
