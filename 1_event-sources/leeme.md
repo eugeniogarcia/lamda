@@ -337,3 +337,15 @@ $Env:CF_BUCKET="egsmartin"
 
 sam deploy --s3-bucket $Env:CF_BUCKET --stack-name miPipeline --capabilities CAPABILITY_IAM
 ```
+
+Para probar podemos usar un payload como este:
+
+```json
+{
+	"locationName":"Oxford, UK", 
+	"temperature":64,
+	"timestamp":1564428898,
+	"latitude": 51.75,
+	"longitude": -1.25
+}
+```
