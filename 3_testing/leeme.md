@@ -142,3 +142,49 @@ En este otro ejemplo, usamos una regla para comprobar que se haya generado un lo
 
 ## Mockito
 
+Podemos crear un mock de los servicios que deseamos emular:
+
+```java
+// Set up mock AWS SDK clients
+AmazonSNS mockSNS = Mockito.mock(AmazonSNS.class);
+AmazonS3 mockS3 = Mockito.mock(AmazonS3.class);
+```
+
+En este caso esperamos que se hagan tres llamadas al método `publish`:
+
+```java
+// Capture outbound SNS messages
+ArgumentCaptor<String> topics = ArgumentCaptor.forClass(String.class);
+ArgumentCaptor<String> messages = ArgumentCaptor.forClass(String.class);
+Mockito.verify(mockSNS, Mockito.times(3)).publish(topics.capture(), messages.capture());
+```
+
+Capturamos los argumentos con los que se ha hecho la llamada a `publish`, y podemos comprobar con que valor se hizo la llamada. Aquí por ejemplo comprobamos los tres valores:
+
+```java
+Assert.assertArrayEquals(new String[]{topic, topic, topic}, topics.getAllValues().toArray());
+Assert.assertArrayEquals(new String[]{
+        "{\"locationName\":\"Brooklyn, NY\",\"temperature\":91.0,\"timestamp\":1564428897,\"longitude\":-73.99,\"latitude\":40.7}",
+        "{\"locationName\":\"Oxford, UK\",\"temperature\":64.0,\"timestamp\":1564428898,\"longitude\":-1.25,\"latitude\":51.75}",
+        "{\"locationName\":\"Charlottesville, VA\",\"temperature\":87.0,\"timestamp\":1564428899,\"longitude\":-78.47,\"latitude\":38.02}"
+}, messages.getAllValues().toArray());
+
+```
+
+En este otro ejemplo definimos la respuesta que tiene que dar el mock cuando se invocado:
+
+```java
+// Fixture S3 event
+S3Event s3Event = objectMapper.readValue(getClass().getResourceAsStream("/s3_event_bad_data.json"), S3Event.class);
+String bucket = s3Event.getRecords().get(0).getS3().getBucket().getName();
+String key = s3Event.getRecords().get(0).getS3().getObject().getKey();
+
+// Fixture S3 return value
+S3Object s3Object = new S3Object();
+s3Object.setObjectContent(getClass().getResourceAsStream(String.format("/%s", key)));
+Mockito.when(mockS3.getObject(bucket, key)).thenReturn(s3Object);
+```
+
+# E2E Tests
+
+En este tipo de test lo que hacemos es utilizar los recursos reales para definir las pruebas. El test usa una nomenclatura, termina en *IT.
